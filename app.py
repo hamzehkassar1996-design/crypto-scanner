@@ -7,13 +7,13 @@ st.title("🔥 Crypto Strategy Scanner (MACD + Bollinger + Ranking)")
 
 exchange = ccxt.coinex()
 
-# 🔹 300 عملة (يمكن توسيعها لاحقاً)
+# 🔹 العملات (ابدأ بـ 10 ثم نرفعها لاحقاً إلى 300)
 symbols = [
     "BTC/USDT","ETH/USDT","XRP/USDT","ADA/USDT","DOGE/USDT",
     "SOL/USDT","BNB/USDT","TRX/USDT","LTC/USDT","AVAX/USDT"
 ]
 
-# --------- Indicators Functions ---------
+# --------- Indicators ---------
 
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
@@ -32,7 +32,7 @@ def bollinger(close, period=20):
     lower = ma - (2 * std)
     return upper, lower
 
-# --------- Scan Data ---------
+# --------- Scan ---------
 
 data = []
 
@@ -44,38 +44,37 @@ for symbol in symbols:
 
         close = df["close"]
 
+        price = close.iloc[-1]
+
         # MACD
         macd_line, signal = macd(close)
-        macd_cross = macd_line.iloc[-1] > signal.iloc[-1] and macd_line.iloc[-2] <= signal.iloc[-2]
+        macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
         # Bollinger
         upper, lower = bollinger(close)
-        price = close.iloc[-1]
+        bb_position = (price - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
 
-        near_lower_bb = price <= lower.iloc[-1] * 1.01
+        # -------- SCORE SYSTEM --------
+        score = 0
 
-        # -------- Score System --------
-        
-# 🔹 MACD strength (بدل شرط فقط)
-macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
-score += max(min(macd_strength * 10, 5), 0)
+        # MACD contribution
+        score += max(min(macd_strength * 10, 5), 0)
 
-# 🔹 Bollinger position (قرب من الأسفل)
-bb_position = (price - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
+        # Bollinger contribution
+        if bb_position < 0.2:
+            score += 4
+        elif bb_position < 0.4:
+            score += 2
 
-if bb_position < 0.2:
-    score += 4
-elif bb_position < 0.4:
-    score += 2
+        # small variation (to improve ranking difference)
+        score += 0.5
 
-# 🔹 bonus بسيط لتغيير النتائج
-score += 0.5
         data.append({
             "Coin": symbol,
             "Price": price,
-            "MACD Cross": macd_cross,
-            "Near BB Lower": near_lower_bb,
-            "Score": score
+            "MACD Strength": round(macd_strength, 4),
+            "BB Position": round(bb_position, 3),
+            "Score": round(score, 2)
         })
 
     except:
