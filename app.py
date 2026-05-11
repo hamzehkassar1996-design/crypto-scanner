@@ -55,18 +55,21 @@ for symbol in symbols:
         near_lower_bb = price <= lower.iloc[-1] * 1.01
 
         # -------- Score System --------
-        score = 0
+        
+# 🔹 MACD strength (بدل شرط فقط)
+macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
+score += max(min(macd_strength * 10, 5), 0)
 
-        if macd_cross:
-            score += 6
+# 🔹 Bollinger position (قرب من الأسفل)
+bb_position = (price - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
 
-        if near_lower_bb:
-            score += 4
+if bb_position < 0.2:
+    score += 4
+elif bb_position < 0.4:
+    score += 2
 
-        # extra strength
-        if macd_line.iloc[-1] > 0:
-            score += 2
-
+# 🔹 bonus بسيط لتغيير النتائج
+score += 0.5
         data.append({
             "Coin": symbol,
             "Price": price,
