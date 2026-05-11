@@ -3,17 +3,16 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Crypto Strategy Scanner (MACD + Bollinger + Ranking)")
+st.title("🔥 Crypto Scanner v2 (MACD + BB + EMA Filter)")
 
 exchange = ccxt.coinex()
 
-# 🔹 العملات (ابدأ بـ 10 ثم نرفعها لاحقاً إلى 300)
 symbols = [
     "BTC/USDT","ETH/USDT","XRP/USDT","ADA/USDT","DOGE/USDT",
     "SOL/USDT","BNB/USDT","TRX/USDT","LTC/USDT","AVAX/USDT"
 ]
 
-# --------- Indicators ---------
+# -------- Indicators --------
 
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
@@ -30,20 +29,18 @@ def bollinger(close, period=20):
     std = close.rolling(period).std()
     upper = ma + (2 * std)
     lower = ma - (2 * std)
-    return upper, lower
+    return upper, lower, ma
 
-# --------- Scan ---------
+# -------- Scan --------
 
 data = []
 
 for symbol in symbols:
     try:
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe='15m', limit=100)
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe='15m', limit=200)
 
         df = pd.DataFrame(ohlcv, columns=["time","open","high","low","close","volume"])
-
         close = df["close"]
-
         price = close.iloc[-1]
 
         # MACD
@@ -51,10 +48,14 @@ for symbol in symbols:
         macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
         # Bollinger
-        upper, lower = bollinger(close)
+        upper, lower, bb_ma = bollinger(close)
         bb_position = (price - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
 
-        # -------- SCORE SYSTEM --------
+        # EMA 200 (Trend Filter)
+        ema200 = ema(close, 200).iloc[-1]
+        trend_ok = price > ema200
+
+        # -------- SCORE --------
         score = 0
 
         # MACD contribution
@@ -66,21 +67,25 @@ for symbol in symbols:
         elif bb_position < 0.4:
             score += 2
 
-        # small variation (to improve ranking difference)
-        score += 0.5
+        # Trend filter bonus (مهم جداً)
+        if trend_ok:
+            score += 3
+        else:
+            score -= 2  # عقوبة لو ضد الترند
+
+        score += 0.5  # توازن بسيط
 
         data.append({
             "Coin": symbol,
             "Price": price,
             "MACD Strength": round(macd_strength, 4),
             "BB Position": round(bb_position, 3),
+            "EMA200 Trend": trend_ok,
             "Score": round(score, 2)
         })
 
     except:
         continue
-
-# --------- Final Ranking ---------
 
 df = pd.DataFrame(data)
 df = df.sort_values(by="Score", ascending=False)
