@@ -3,16 +3,29 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Crypto Scanner v2 (MACD + BB + EMA Filter)")
+st.title("🔥 Advanced Crypto Scanner (Custom Universe + Ranking)")
 
 exchange = ccxt.coinex()
 
-symbols = [
-    "BTC/USDT","ETH/USDT","XRP/USDT","ADA/USDT","DOGE/USDT",
-    "SOL/USDT","BNB/USDT","TRX/USDT","LTC/USDT","AVAX/USDT"
-]
+# =========================
+# 🟢 YOUR FULL LIST (RAW)
+# =========================
+symbols_raw = """
+DOCK, EMC, ISP, CHRP, EFX, SLN, NETVR, CAIR, SMAND, DEGEN, PRQ, OORT, HGPT,
+FROKAI, GTAI, NAI, CERE, LIME, NTX, AURORA, AVIVE, DOP, UXLINK, GLM, LIT, ICX,
+STX, ARDR, MANA, GAL, LUNA, FTM, AXL, GAC, BLUR, RAD, CYBER, MOBILE, CBAI,
+BOBA, BLOCX, ORBR, SYNT, WSDM, NLK, ANYONE, WOOP, SMH, TOMI, STORY, HTR,
+ATS, OGN, DEXE, REQ, CVC, HEDERA, COMBO, BICO, SCRT, FLUX, NULS, EDU, MTL,
+STEEM, DCR, WRX, ZETA, NMT, GLQ, DEAI, SAVM, ATR, PYUSD, EAI, PRE, NIBI,
+AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
+"""
 
-# -------- Indicators --------
+# تحويل إلى USDT pairs
+symbols = [s.strip().upper() + "/USDT" for s in symbols_raw.split(",")]
+
+# =========================
+# Indicators
+# =========================
 
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
@@ -24,23 +37,28 @@ def macd(close):
     signal = ema(macd_line, 9)
     return macd_line, signal
 
-def bollinger(close, period=20):
-    ma = close.rolling(period).mean()
-    std = close.rolling(period).std()
+def bollinger(close):
+    ma = close.rolling(20).mean()
+    std = close.rolling(20).std()
     upper = ma + (2 * std)
     lower = ma - (2 * std)
-    return upper, lower, ma
+    return upper, lower
 
-# -------- Scan --------
+# =========================
+# Scan Engine
+# =========================
 
 data = []
 
 for symbol in symbols:
     try:
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe='15m', limit=200)
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe='15m', limit=120)
 
-        df = pd.DataFrame(ohlcv, columns=["time","open","high","low","close","volume"])
-        close = df["close"]
+        if not ohlcv or len(ohlcv) < 50:
+            continue
+
+        df = pd.DataFrame(ohlcv, columns=["t","o","h","l","c","v"])
+        close = df["c"]
         price = close.iloc[-1]
 
         # MACD
@@ -48,44 +66,49 @@ for symbol in symbols:
         macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
         # Bollinger
-        upper, lower, bb_ma = bollinger(close)
+        upper, lower = bollinger(close)
         bb_position = (price - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
 
-        # EMA 200 (Trend Filter)
+        # EMA trend filter
         ema200 = ema(close, 200).iloc[-1]
-        trend_ok = price > ema200
+        trend = price > ema200
 
-        # -------- SCORE --------
+        # =========================
+        # SCORE SYSTEM
+        # =========================
         score = 0
 
-        # MACD contribution
+        # MACD
         score += max(min(macd_strength * 10, 5), 0)
 
-        # Bollinger contribution
+        # Bollinger
         if bb_position < 0.2:
             score += 4
         elif bb_position < 0.4:
             score += 2
 
-        # Trend filter bonus (مهم جداً)
-        if trend_ok:
+        # Trend filter
+        if trend:
             score += 3
         else:
-            score -= 2  # عقوبة لو ضد الترند
+            score -= 2
 
-        score += 0.5  # توازن بسيط
+        # Stability bonus
+        score += 0.5
 
         data.append({
             "Coin": symbol,
             "Price": price,
-            "MACD Strength": round(macd_strength, 4),
-            "BB Position": round(bb_position, 3),
-            "EMA200 Trend": trend_ok,
-            "Score": round(score, 2)
+            "Score": round(score, 2),
+            "Trend": trend
         })
 
     except:
         continue
+
+# =========================
+# Final Output
+# =========================
 
 df = pd.DataFrame(data)
 df = df.sort_values(by="Score", ascending=False)
