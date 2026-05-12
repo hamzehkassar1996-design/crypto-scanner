@@ -1,35 +1,34 @@
 import streamlit as st
 import pandas as pd
 import ccxt
-import numpy as np
 
-st.title("🔥 Simple Crypto Scanner (Top 10 | MACD + Bollinger | 15m)")
+st.title("🔥 Stable Top 10 Scanner (Fixed Symbols)")
 
-# =========================
-# Exchange
-# =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
     "timeout": 10000
 })
 
 # =========================
-# 50 COINS
+# FIX: Get real Binance USDT pairs
 # =========================
-symbols_raw = """
-BTC, ETH, BNB, SOL, XRP, ADA, DOGE, TRX, AVAX,
-TON, SHIB, LTC, DOT, BCH, LINK, MATIC, UNI, ATOM,
-ETC, NEAR, FIL, APT, ARB, OP, ICP, VET, ALGO,
-XLM, HBAR, SAND, MANA, AAVE, EGLD, GRT, THETA,
-AXS, QNT, IMX, INJ, RNDR, FTM, CRV, RUNE, KAVA,
-GALA, ZEC, COMP, SNX, LDO
-"""
+try:
+    markets = exchange.fetch_tickers()
 
-allowed = [s.strip().upper() for s in symbols_raw.split(",") if s.strip()]
-symbols = [f"{coin}/USDT" for coin in allowed]
+    all_symbols = [
+        s for s in markets.keys()
+        if s.endswith("/USDT")
+    ]
+
+    # نأخذ أول 50 عملة فقط
+    symbols = all_symbols[:50]
+
+except:
+    st.error("❌ Failed to load market data")
+    st.stop()
 
 # =========================
-# INDICATORS
+# Indicators
 # =========================
 
 def ema(series, period):
@@ -67,18 +66,13 @@ for symbol in symbols:
         close = df["c"]
         price = close.iloc[-1]
 
-        # MACD
         macd_line, signal = macd(close)
         macd_value = macd_line.iloc[-1] - signal.iloc[-1]
 
-        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
-        # =========================
-        # SCORE SYSTEM (SIMPLE)
-        # =========================
         score = 0
 
         if macd_value > 0:
@@ -87,7 +81,6 @@ for symbol in symbols:
         if bb_position < 0.5:
             score += 1
 
-        # SIGNAL
         if score == 2:
             signal_type = "🔥 BUY"
         elif score == 1:
@@ -97,26 +90,20 @@ for symbol in symbols:
 
         data.append({
             "Coin": symbol,
-            "Price": round(price, 6),
+            "Price": price,
             "Score": score,
-            "MACD": round(macd_value, 4),
-            "BB Position": round(bb_position, 2),
             "Signal": signal_type
         })
 
     except:
         continue
 
-# =========================
-# OUTPUT
-# =========================
-
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No data available right now.")
+    st.warning("⚠️ No signals available right now.")
 else:
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top 10 Opportunities (Ranked)")
+    st.subheader("🔥 Top 10 Opportunities")
     st.dataframe(df.head(10))
