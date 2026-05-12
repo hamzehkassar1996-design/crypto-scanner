@@ -3,10 +3,10 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Stable Crypto Scanner (No Crash Version)")
+st.title("🔥 Stable Crypto Scanner (Final Safe Version)")
 
 # =========================
-# Exchange (SAFE MODE)
+# Exchange (Safe Config)
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
@@ -14,7 +14,7 @@ exchange = ccxt.binance({
 })
 
 # =========================
-# YOUR UNIVERSE
+# YOUR HALAL UNIVERSE
 # =========================
 symbols_raw = """
 DOCK, EMC, ISP, CHRP, EFX, SLN, NETVR, CAIR, SMAND, DEGEN, PRQ, OORT, HGPT,
@@ -29,14 +29,24 @@ AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
 allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
 
 # =========================
-# FINAL SAFE SYMBOL LIST
-# (NO load_markets, NO fetch_tickers)
+# SAFE MARKET FILTER
 # =========================
-symbols = [f"{coin}/USDT" for coin in allowed]
+try:
+    markets = exchange.load_markets()
+
+    symbols = [
+        s for s in markets
+        if s.endswith("/USDT") and s.split("/")[0] in allowed
+    ]
+
+except:
+    st.error("❌ Failed to load markets from Binance")
+    st.stop()
 
 # =========================
 # Indicators
 # =========================
+
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
@@ -55,7 +65,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# SCANNER (FULL SAFE MODE)
+# SCANNER ENGINE
 # =========================
 
 data = []
@@ -70,18 +80,33 @@ for symbol in symbols:
 
         df = pd.DataFrame(ohlcv, columns=["t","o","h","l","c","v"])
         close = df["c"]
+        volume = df["v"]
+
         price = close.iloc[-1]
 
+        # Volume filter
+        avg_volume = volume.rolling(20).mean().iloc[-1]
+        last_volume = volume.iloc[-1]
+
+        volume_ratio = last_volume / avg_volume if avg_volume != 0 else 0
+
+        if volume_ratio < 0.7:
+            continue
+
+        # MACD
         macd_line, signal = macd(close)
         macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
+        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
+        # Trend
         ema200 = ema(close, 200).iloc[-1]
         trend = price > ema200
 
+        # SCORE
         score = 0
 
         score += max(min(macd_strength * 10, 5), 0)
@@ -96,8 +121,14 @@ for symbol in symbols:
         else:
             score -= 1.5
 
+        if volume_ratio > 1.5:
+            score += 2
+        elif volume_ratio > 1:
+            score += 1
+
         score += 0.5
 
+        # SIGNAL TYPE
         if score >= 7:
             signal_type = "🔥 STRONG BUY"
         elif score >= 4:
@@ -109,11 +140,11 @@ for symbol in symbols:
             "Coin": symbol,
             "Price": price,
             "Score": round(score, 2),
+            "Volume": round(volume_ratio, 2),
             "Signal": signal_type
         })
 
     except:
-        # 🔥 IMPORTANT: NEVER crash app
         continue
 
 # =========================
@@ -123,10 +154,13 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No data available right now. Binance may be slow or rate-limited.")
+    st.warning("⚠️ No signals available right now. Market may be quiet or filtered.")
 else:
-    df = df[df["Score"] > 1]
+
+    df = df[df["Score"] > 0]
+
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top Opportunities")
+    st.subheader("🔥 Top Opportunities (Balanced & Safe)")
+
     st.dataframe(df.head(20))
