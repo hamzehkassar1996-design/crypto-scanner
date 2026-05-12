@@ -1,45 +1,31 @@
 import streamlit as st
 import pandas as pd
 import ccxt
-import time
 
-st.title("🔥 Stable Top 10 Scanner (Ultra Stable Mode)")
+st.title("🔥 CoinEx Style Scanner (Simple & Active Signals)")
 
 # =========================
-# Exchange
+# Exchange (CoinEx Style)
 # =========================
-exchange = ccxt.binance({
+exchange = ccxt.coinex({
     "enableRateLimit": True,
-    "timeout": 30000,
-    "options": {
-        "defaultType": "spot"
-    }
+    "timeout": 15000
 })
 
 # =========================
-# Test Connection
-# =========================
-try:
-    exchange.fetch_ohlcv("BTC/USDT", "15m", limit=5)
-    st.success("✅ Binance connection OK")
-except Exception as e:
-    st.error(f"❌ Connection failed: {e}")
-    st.stop()
-
-# =========================
-# Coins
+# 50 COINS (same idea as before)
 # =========================
 symbols = [
-    "BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","XRP/USDT",
-    "ADA/USDT","DOGE/USDT","TRX/USDT","AVAX/USDT","TON/USDT",
-    "SHIB/USDT","LTC/USDT","DOT/USDT","BCH/USDT","LINK/USDT",
-    "MATIC/USDT","UNI/USDT","ATOM/USDT","ETC/USDT","NEAR/USDT",
-    "FIL/USDT","APT/USDT","ARB/USDT","OP/USDT","ICP/USDT",
-    "VET/USDT","ALGO/USDT","XLM/USDT","HBAR/USDT","SAND/USDT",
-    "MANA/USDT","AAVE/USDT","EGLD/USDT","GRT/USDT","THETA/USDT",
-    "AXS/USDT","QNT/USDT","IMX/USDT","INJ/USDT","RNDR/USDT",
-    "FTM/USDT","CRV/USDT","RUNE/USDT","KAVA/USDT","GALA/USDT",
-    "ZEC/USDT","COMP/USDT","SNX/USDT","LDO/USDT"
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",
+    "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "TON/USDT",
+    "SHIB/USDT", "LTC/USDT", "DOT/USDT", "BCH/USDT", "LINK/USDT",
+    "MATIC/USDT", "UNI/USDT", "ATOM/USDT", "ETC/USDT", "NEAR/USDT",
+    "FIL/USDT", "APT/USDT", "ARB/USDT", "OP/USDT", "ICP/USDT",
+    "VET/USDT", "ALGO/USDT", "XLM/USDT", "HBAR/USDT", "SAND/USDT",
+    "MANA/USDT", "AAVE/USDT", "EGLD/USDT", "GRT/USDT", "THETA/USDT",
+    "AXS/USDT", "QNT/USDT", "IMX/USDT", "INJ/USDT", "RNDR/USDT",
+    "FTM/USDT", "CRV/USDT", "RUNE/USDT", "KAVA/USDT", "GALA/USDT",
+    "ZEC/USDT", "COMP/USDT", "SNX/USDT", "LDO/USDT"
 ]
 
 # =========================
@@ -64,7 +50,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# Scanner
+# SCANNER
 # =========================
 
 data = []
@@ -72,16 +58,7 @@ data = []
 for symbol in symbols:
 
     try:
-        ohlcv = None
-
-        # 🔁 Retry logic (مهم جدًا)
-        for i in range(2):
-            try:
-                ohlcv = exchange.fetch_ohlcv(symbol, "15m", limit=120)
-                if ohlcv:
-                    break
-            except:
-                time.sleep(0.3)
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe="15m", limit=120)
 
         if not ohlcv or len(ohlcv) < 50:
             continue
@@ -90,34 +67,51 @@ for symbol in symbols:
         close = df["c"]
         price = close.iloc[-1]
 
+        # MACD
         macd_line, signal = macd(close)
         macd_value = macd_line.iloc[-1] - signal.iloc[-1]
 
+        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
+        # =========================
+        # COINEX STYLE SIGNAL
+        # (خفيف + يعطي إشارات أكثر)
+        # =========================
+
         score = 0
 
+        # MACD (خفيف جدًا)
         if macd_value > 0:
             score += 1
+        elif macd_value > -0.0005:
+            score += 0.5
 
-        if bb_position < 0.5:
+        # Bollinger (مرن جدًا)
+        if bb_position < 0.6:
             score += 1
+        elif bb_position < 0.8:
+            score += 0.5
 
-        if score == 2:
+        # =========================
+        # SIGNAL TYPE (CoinEx style)
+        # =========================
+
+        if score >= 1.5:
             signal_type = "🔥 BUY"
-        elif score == 1:
+        elif score >= 1:
             signal_type = "👀 WATCH"
         else:
-            signal_type = "❌ NO SIGNAL"
+            signal_type = "❌ WEAK"
 
         data.append({
             "Coin": symbol,
             "Price": price,
             "Score": score,
             "MACD": round(macd_value, 4),
-            "BB Position": round(bb_position, 2),
+            "BB": round(bb_position, 2),
             "Signal": signal_type
         })
 
@@ -131,9 +125,9 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No data available right now (market delay or rate limit).")
+    st.warning("⚠️ No data available right now.")
 else:
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top 10 Opportunities")
+    st.subheader("🔥 Top 10 Opportunities (CoinEx Style)")
     st.dataframe(df.head(10))
