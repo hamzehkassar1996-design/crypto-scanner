@@ -32,8 +32,14 @@ allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
 # SAFE MARKET FILTER
 # =========================
 try:
-    markets = exchange.load_markets()
+    exchange = ccxt.binance({
+    "enableRateLimit": True,
+    "timeout": 10000
+})
 
+symbols = [
+    f"{coin}/USDT" for coin in allowed
+]
     symbols = [
         s for s in markets
         if s.endswith("/USDT") and s.split("/")[0] in allowed
