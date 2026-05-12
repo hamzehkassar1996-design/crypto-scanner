@@ -178,6 +178,27 @@ for symbol in symbols:
 
 df = pd.DataFrame(data)
 
+# إذا لا توجد نتائج
+if df.empty:
+
+    st.warning("⚠️ No valid coins found from your list on Binance.")
+
+else:
+
+    # حذف العملات الضعيفة
+    df = df[df["Score"] > 2]
+
+    # ترتيب حسب القوة
+    df = df.sort_values(
+        by="Score",
+        ascending=False
+    )
+
+    # عرض أفضل 10 فرص فقط
+    st.subheader("🔥 Top 10 Opportunities")
+
+    st.dataframe(df.head(10))
+
 # حذف العملات الضعيفة
 df = df[df["Score"] > 2]
 
