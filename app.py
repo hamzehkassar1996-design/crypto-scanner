@@ -3,10 +3,10 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Stable Crypto Scanner (Final Safe Version)")
+st.title("🔥 Stable Crypto Scanner (Final Clean Version)")
 
 # =========================
-# Exchange (Safe Config)
+# Exchange Setup (SAFE)
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
@@ -14,7 +14,7 @@ exchange = ccxt.binance({
 })
 
 # =========================
-# YOUR HALAL UNIVERSE
+# YOUR COIN LIST
 # =========================
 symbols_raw = """
 DOCK, EMC, ISP, CHRP, EFX, SLN, NETVR, CAIR, SMAND, DEGEN, PRQ, OORT, HGPT,
@@ -29,28 +29,12 @@ AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
 allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
 
 # =========================
-# SAFE MARKET FILTER
+# FINAL SYMBOL LIST (NO API MARKET LOAD)
 # =========================
-try:
-    exchange = ccxt.binance({
-    "enableRateLimit": True,
-    "timeout": 10000
-})
-
-symbols = [
-    f"{coin}/USDT" for coin in allowed
-]
-    symbols = [
-        s for s in markets
-        if s.endswith("/USDT") and s.split("/")[0] in allowed
-    ]
-
-except:
-    st.error("❌ Failed to load markets from Binance")
-    st.stop()
+symbols = [f"{coin}/USDT" for coin in allowed]
 
 # =========================
-# Indicators
+# INDICATORS
 # =========================
 
 def ema(series, period):
@@ -112,7 +96,7 @@ for symbol in symbols:
         ema200 = ema(close, 200).iloc[-1]
         trend = price > ema200
 
-        # SCORE
+        # SCORE SYSTEM
         score = 0
 
         score += max(min(macd_strength * 10, 5), 0)
@@ -154,19 +138,16 @@ for symbol in symbols:
         continue
 
 # =========================
-# OUTPUT (SAFE ALWAYS)
+# OUTPUT
 # =========================
 
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No signals available right now. Market may be quiet or filtered.")
+    st.warning("⚠️ No signals available right now. Try again later.")
 else:
-
     df = df[df["Score"] > 0]
-
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top Opportunities (Balanced & Safe)")
-
+    st.subheader("🔥 Top Opportunities (Stable Version)")
     st.dataframe(df.head(20))
