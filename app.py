@@ -3,10 +3,10 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Stable Crypto Scanner (Final Clean Version)")
+st.title("🔥 Stable Crypto Scanner (No Volume Filter Version)")
 
 # =========================
-# Exchange Setup (SAFE)
+# Exchange Setup
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
@@ -27,14 +27,10 @@ AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
 """
 
 allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
-
-# =========================
-# FINAL SYMBOL LIST (NO API MARKET LOAD)
-# =========================
 symbols = [f"{coin}/USDT" for coin in allowed]
 
 # =========================
-# INDICATORS
+# Indicators
 # =========================
 
 def ema(series, period):
@@ -70,55 +66,55 @@ for symbol in symbols:
 
         df = pd.DataFrame(ohlcv, columns=["t","o","h","l","c","v"])
         close = df["c"]
-        volume = df["v"]
-
         price = close.iloc[-1]
 
-        # Volume filter
-        avg_volume = volume.rolling(20).mean().iloc[-1]
-        last_volume = volume.iloc[-1]
-
-        volume_ratio = last_volume / avg_volume if avg_volume != 0 else 0
-
-        if volume_ratio < 0.7:
-            continue
-
+        # =========================
         # MACD
+        # =========================
         macd_line, signal = macd(close)
         macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
+        # =========================
         # Bollinger
+        # =========================
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
+        # =========================
         # Trend
+        # =========================
         ema200 = ema(close, 200).iloc[-1]
         trend = price > ema200
 
-        # SCORE SYSTEM
+        # =========================
+        # SCORE SYSTEM (NO VOLUME FILTER)
+        # =========================
+
         score = 0
 
+        # MACD strength
         score += max(min(macd_strength * 10, 5), 0)
 
-        if bb_position < 0.3:
+        # Bollinger relaxed
+        if bb_position < 0.4:
             score += 4
-        elif bb_position < 0.6:
+        elif bb_position < 0.7:
             score += 2
 
+        # Trend
         if trend:
             score += 2.5
         else:
             score -= 1.5
 
-        if volume_ratio > 1.5:
-            score += 2
-        elif volume_ratio > 1:
-            score += 1
-
+        # small stability bonus
         score += 0.5
 
+        # =========================
         # SIGNAL TYPE
+        # =========================
+
         if score >= 7:
             signal_type = "🔥 STRONG BUY"
         elif score >= 4:
@@ -130,7 +126,6 @@ for symbol in symbols:
             "Coin": symbol,
             "Price": price,
             "Score": round(score, 2),
-            "Volume": round(volume_ratio, 2),
             "Signal": signal_type
         })
 
@@ -144,10 +139,10 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No signals available right now. Try again later.")
+    st.warning("⚠️ No signals available right now.")
 else:
-    df = df[df["Score"] > 0]
+    df = df[df["Score"] > -1]
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top Opportunities (Stable Version)")
+    st.subheader("🔥 Top Opportunities (No Volume Filter)")
     st.dataframe(df.head(20))
