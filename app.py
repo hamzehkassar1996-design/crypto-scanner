@@ -22,8 +22,12 @@ AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
 
 allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
 
-markets = exchange.load_markets()
+markets = exchange.fetch_tickers()
 
+symbols = [
+    symbol for symbol in markets.keys()
+    if symbol.endswith("/USDT")
+]
 symbols = [
     s for s in markets
     if s.endswith("/USDT")
