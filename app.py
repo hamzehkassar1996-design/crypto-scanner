@@ -2,33 +2,37 @@ import streamlit as st
 import pandas as pd
 import ccxt
 
-st.title("🔥 Stable Top 10 Scanner (Fixed Symbols)")
+st.title("🔥 Stable Top 10 Scanner (100% Safe Mode)")
 
+# =========================
+# Exchange (SAFE SETTINGS)
+# =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
-    "timeout": 10000
+    "timeout": 15000,
+    "options": {
+        "adjustForTimeDifference": True
+    }
 })
 
 # =========================
-# FIX: Get real Binance USDT pairs
+# SAFE 50 REAL BINANCE COINS
 # =========================
-try:
-    markets = exchange.fetch_tickers()
-
-    all_symbols = [
-        s for s in markets.keys()
-        if s.endswith("/USDT")
-    ]
-
-    # نأخذ أول 50 عملة فقط
-    symbols = all_symbols[:50]
-
-except:
-    st.error("❌ Failed to load market data")
-    st.stop()
+symbols = [
+    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",
+    "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "TON/USDT",
+    "SHIB/USDT", "LTC/USDT", "DOT/USDT", "BCH/USDT", "LINK/USDT",
+    "MATIC/USDT", "UNI/USDT", "ATOM/USDT", "ETC/USDT", "NEAR/USDT",
+    "FIL/USDT", "APT/USDT", "ARB/USDT", "OP/USDT", "ICP/USDT",
+    "VET/USDT", "ALGO/USDT", "XLM/USDT", "HBAR/USDT", "SAND/USDT",
+    "MANA/USDT", "AAVE/USDT", "EGLD/USDT", "GRT/USDT", "THETA/USDT",
+    "AXS/USDT", "QNT/USDT", "IMX/USDT", "INJ/USDT", "RNDR/USDT",
+    "FTM/USDT", "CRV/USDT", "RUNE/USDT", "KAVA/USDT", "GALA/USDT",
+    "ZEC/USDT", "COMP/USDT", "SNX/USDT", "LDO/USDT"
+]
 
 # =========================
-# Indicators
+# INDICATORS
 # =========================
 
 def ema(series, period):
@@ -101,7 +105,7 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No signals available right now.")
+    st.warning("⚠️ No data available right now.")
 else:
     df = df.sort_values(by="Score", ascending=False)
 
