@@ -2,21 +2,34 @@ import streamlit as st
 import pandas as pd
 import ccxt
 
-st.title("🔥 Stable Top 10 Scanner (100% Safe Mode)")
+st.title("🔥 Stable Top 10 Scanner (Debug + Safe Mode)")
 
 # =========================
-# Exchange (SAFE SETTINGS)
+# Exchange Setup (STABLE)
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
-    "timeout": 15000,
+    "timeout": 30000,
     "options": {
-        "adjustForTimeDifference": True
+        "defaultType": "spot"
+    },
+    "headers": {
+        "User-Agent": "Mozilla/5.0"
     }
 })
 
 # =========================
-# SAFE 50 REAL BINANCE COINS
+# TEST CONNECTION (IMPORTANT)
+# =========================
+try:
+    test = exchange.fetch_ohlcv("BTC/USDT", "15m", limit=5)
+    st.success("✅ Binance connection OK")
+except Exception as e:
+    st.error(f"❌ Connection failed: {e}")
+    st.stop()
+
+# =========================
+# 50 COINS
 # =========================
 symbols = [
     "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",
@@ -53,7 +66,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# SCANNER
+# SCANNER ENGINE
 # =========================
 
 data = []
@@ -70,13 +83,18 @@ for symbol in symbols:
         close = df["c"]
         price = close.iloc[-1]
 
+        # MACD
         macd_line, signal = macd(close)
         macd_value = macd_line.iloc[-1] - signal.iloc[-1]
 
+        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
+        # =========================
+        # SCORE SYSTEM
+        # =========================
         score = 0
 
         if macd_value > 0:
@@ -96,11 +114,18 @@ for symbol in symbols:
             "Coin": symbol,
             "Price": price,
             "Score": score,
+            "MACD": round(macd_value, 4),
+            "BB Position": round(bb_position, 2),
             "Signal": signal_type
         })
 
-    except:
+    except Exception as e:
+        st.write(f"Error in {symbol}: {e}")
         continue
+
+# =========================
+# OUTPUT
+# =========================
 
 df = pd.DataFrame(data)
 
