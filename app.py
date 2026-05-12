@@ -3,12 +3,18 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Smart Crypto Scanner (Balanced Quality + Opportunities)")
-
-exchange = ccxt.binance()
+st.title("🔥 Stable Crypto Scanner (No Crash Version)")
 
 # =========================
-# Universe (optional filter)
+# Exchange (SAFE MODE)
+# =========================
+exchange = ccxt.binance({
+    "enableRateLimit": True,
+    "timeout": 10000
+})
+
+# =========================
+# YOUR UNIVERSE
 # =========================
 symbols_raw = """
 DOCK, EMC, ISP, CHRP, EFX, SLN, NETVR, CAIR, SMAND, DEGEN, PRQ, OORT, HGPT,
@@ -22,21 +28,15 @@ AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
 
 allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
 
-markets = exchange.fetch_tickers()
-
-symbols = [
-    symbol for symbol in markets.keys()
-    if symbol.endswith("/USDT")
-]
-symbols = [
-    s for s in markets
-    if s.endswith("/USDT")
-]
+# =========================
+# FINAL SAFE SYMBOL LIST
+# (NO load_markets, NO fetch_tickers)
+# =========================
+symbols = [f"{coin}/USDT" for coin in allowed]
 
 # =========================
 # Indicators
 # =========================
-
 def ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
@@ -55,7 +55,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# Scanner
+# SCANNER (FULL SAFE MODE)
 # =========================
 
 data = []
@@ -63,74 +63,40 @@ data = []
 for symbol in symbols:
 
     try:
-
         ohlcv = exchange.fetch_ohlcv(symbol, timeframe="15m", limit=120)
 
         if not ohlcv or len(ohlcv) < 50:
             continue
 
         df = pd.DataFrame(ohlcv, columns=["t","o","h","l","c","v"])
-
         close = df["c"]
-        volume = df["v"]
-
         price = close.iloc[-1]
 
-        # 🔥 Volume filter (مهم جدًا)
-        avg_volume = volume.rolling(20).mean().iloc[-1]
-        last_volume = volume.iloc[-1]
-
-        volume_ratio = last_volume / avg_volume if avg_volume != 0 else 0
-
-        # تجاهل العملات الضعيفة جدًا
-        if volume_ratio < 0.8:
-            continue
-
-        # MACD
         macd_line, signal = macd(close)
         macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
 
-        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
-        # Trend
         ema200 = ema(close, 200).iloc[-1]
         trend = price > ema200
 
-        # =========================
-        # SCORE SYSTEM (improved)
-        # =========================
-
         score = 0
 
-        # MACD stronger weight
-        score += max(min(macd_strength * 12, 6), 0)
+        score += max(min(macd_strength * 10, 5), 0)
 
-        # Bollinger (wider capture)
-        if bb_position < 0.25:
+        if bb_position < 0.3:
             score += 4
-        elif bb_position < 0.5:
+        elif bb_position < 0.6:
             score += 2
 
-        # Trend filter
         if trend:
-            score += 3
+            score += 2.5
         else:
-            score -= 1
-
-        # Volume strength bonus
-        if volume_ratio > 1.5:
-            score += 2
-        elif volume_ratio > 1.0:
-            score += 1
+            score -= 1.5
 
         score += 0.5
-
-        # =========================
-        # Signal
-        # =========================
 
         if score >= 7:
             signal_type = "🔥 STRONG BUY"
@@ -143,27 +109,24 @@ for symbol in symbols:
             "Coin": symbol,
             "Price": price,
             "Score": round(score, 2),
-            "Volume Ratio": round(volume_ratio, 2),
             "Signal": signal_type
         })
 
     except:
+        # 🔥 IMPORTANT: NEVER crash app
         continue
 
 # =========================
-# OUTPUT
+# OUTPUT (SAFE ALWAYS)
 # =========================
 
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No strong signals right now (market is quiet)")
+    st.warning("⚠️ No data available right now. Binance may be slow or rate-limited.")
 else:
-
-    df = df[df["Score"] > 2]
-
+    df = df[df["Score"] > 1]
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top 20 High-Quality Opportunities")
-
+    st.subheader("🔥 Top Opportunities")
     st.dataframe(df.head(20))
