@@ -3,10 +3,10 @@ import pandas as pd
 import ccxt
 import numpy as np
 
-st.title("🔥 Stable Crypto Scanner (No Volume Filter Version)")
+st.title("🔥 Simple Crypto Scanner (Top 10 | MACD + Bollinger | 15m)")
 
 # =========================
-# Exchange Setup
+# Exchange
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
@@ -14,23 +14,22 @@ exchange = ccxt.binance({
 })
 
 # =========================
-# YOUR COIN LIST
+# 50 COINS
 # =========================
 symbols_raw = """
-DOCK, EMC, ISP, CHRP, EFX, SLN, NETVR, CAIR, SMAND, DEGEN, PRQ, OORT, HGPT,
-FROKAI, GTAI, NAI, CERE, LIME, NTX, AURORA, AVIVE, DOP, UXLINK, GLM, LIT, ICX,
-STX, ARDR, MANA, GAL, LUNA, FTM, AXL, GAC, BLUR, RAD, CYBER, MOBILE, CBAI,
-BOBA, BLOCX, ORBR, SYNT, WSDM, NLK, ANYONE, WOOP, SMH, TOMI, STORY, HTR,
-ATS, OGN, DEXE, REQ, CVC, HEDERA, COMBO, BICO, SCRT, FLUX, NULS, EDU, MTL,
-STEEM, DCR, WRX, ZETA, NMT, GLQ, DEAI, SAVM, ATR, PYUSD, EAI, PRE, NIBI,
-AREA, HNT, EVMOS, XPR, TAIKO, XYO, ORBS, MND, MOVE, TON, ARB, BTC, ETH, XRP
+BTC, ETH, BNB, SOL, XRP, ADA, DOGE, TRX, AVAX,
+TON, SHIB, LTC, DOT, BCH, LINK, MATIC, UNI, ATOM,
+ETC, NEAR, FIL, APT, ARB, OP, ICP, VET, ALGO,
+XLM, HBAR, SAND, MANA, AAVE, EGLD, GRT, THETA,
+AXS, QNT, IMX, INJ, RNDR, FTM, CRV, RUNE, KAVA,
+GALA, ZEC, COMP, SNX, LDO
 """
 
-allowed = set([s.strip().upper() for s in symbols_raw.split(",") if s.strip()])
+allowed = [s.strip().upper() for s in symbols_raw.split(",") if s.strip()]
 symbols = [f"{coin}/USDT" for coin in allowed]
 
 # =========================
-# Indicators
+# INDICATORS
 # =========================
 
 def ema(series, period):
@@ -51,7 +50,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# SCANNER ENGINE
+# SCANNER
 # =========================
 
 data = []
@@ -68,64 +67,40 @@ for symbol in symbols:
         close = df["c"]
         price = close.iloc[-1]
 
-        # =========================
         # MACD
-        # =========================
         macd_line, signal = macd(close)
-        macd_strength = macd_line.iloc[-1] - signal.iloc[-1]
+        macd_value = macd_line.iloc[-1] - signal.iloc[-1]
 
-        # =========================
         # Bollinger
-        # =========================
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
         # =========================
-        # Trend
+        # SCORE SYSTEM (SIMPLE)
         # =========================
-        ema200 = ema(close, 200).iloc[-1]
-        trend = price > ema200
-
-        # =========================
-        # SCORE SYSTEM (NO VOLUME FILTER)
-        # =========================
-
         score = 0
 
-        # MACD strength
-        score += max(min(macd_strength * 10, 5), 0)
+        if macd_value > 0:
+            score += 1
 
-        # Bollinger relaxed
-        if bb_position < 0.4:
-            score += 4
-        elif bb_position < 0.7:
-            score += 2
+        if bb_position < 0.5:
+            score += 1
 
-        # Trend
-        if trend:
-            score += 2.5
-        else:
-            score -= 1.5
-
-        # small stability bonus
-        score += 0.5
-
-        # =========================
-        # SIGNAL TYPE
-        # =========================
-
-        if score >= 7:
-            signal_type = "🔥 STRONG BUY"
-        elif score >= 4:
+        # SIGNAL
+        if score == 2:
+            signal_type = "🔥 BUY"
+        elif score == 1:
             signal_type = "👀 WATCH"
         else:
-            signal_type = "❌ WEAK"
+            signal_type = "❌ NO SIGNAL"
 
         data.append({
             "Coin": symbol,
-            "Price": price,
-            "Score": round(score, 2),
+            "Price": round(price, 6),
+            "Score": score,
+            "MACD": round(macd_value, 4),
+            "BB Position": round(bb_position, 2),
             "Signal": signal_type
         })
 
@@ -139,10 +114,9 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No signals available right now.")
+    st.warning("⚠️ No data available right now.")
 else:
-    df = df[df["Score"] > -1]
     df = df.sort_values(by="Score", ascending=False)
 
-    st.subheader("🔥 Top Opportunities (No Volume Filter)")
-    st.dataframe(df.head(20))
+    st.subheader("🔥 Top 10 Opportunities (Ranked)")
+    st.dataframe(df.head(10))
