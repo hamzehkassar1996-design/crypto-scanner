@@ -1,51 +1,49 @@
 import streamlit as st
 import pandas as pd
 import ccxt
+import time
 
-st.title("🔥 Stable Top 10 Scanner (Debug + Safe Mode)")
+st.title("🔥 Stable Top 10 Scanner (Ultra Stable Mode)")
 
 # =========================
-# Exchange Setup (STABLE)
+# Exchange
 # =========================
 exchange = ccxt.binance({
     "enableRateLimit": True,
     "timeout": 30000,
     "options": {
         "defaultType": "spot"
-    },
-    "headers": {
-        "User-Agent": "Mozilla/5.0"
     }
 })
 
 # =========================
-# TEST CONNECTION (IMPORTANT)
+# Test Connection
 # =========================
 try:
-    test = exchange.fetch_ohlcv("BTC/USDT", "15m", limit=5)
+    exchange.fetch_ohlcv("BTC/USDT", "15m", limit=5)
     st.success("✅ Binance connection OK")
 except Exception as e:
     st.error(f"❌ Connection failed: {e}")
     st.stop()
 
 # =========================
-# 50 COINS
+# Coins
 # =========================
 symbols = [
-    "BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "XRP/USDT",
-    "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "TON/USDT",
-    "SHIB/USDT", "LTC/USDT", "DOT/USDT", "BCH/USDT", "LINK/USDT",
-    "MATIC/USDT", "UNI/USDT", "ATOM/USDT", "ETC/USDT", "NEAR/USDT",
-    "FIL/USDT", "APT/USDT", "ARB/USDT", "OP/USDT", "ICP/USDT",
-    "VET/USDT", "ALGO/USDT", "XLM/USDT", "HBAR/USDT", "SAND/USDT",
-    "MANA/USDT", "AAVE/USDT", "EGLD/USDT", "GRT/USDT", "THETA/USDT",
-    "AXS/USDT", "QNT/USDT", "IMX/USDT", "INJ/USDT", "RNDR/USDT",
-    "FTM/USDT", "CRV/USDT", "RUNE/USDT", "KAVA/USDT", "GALA/USDT",
-    "ZEC/USDT", "COMP/USDT", "SNX/USDT", "LDO/USDT"
+    "BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","XRP/USDT",
+    "ADA/USDT","DOGE/USDT","TRX/USDT","AVAX/USDT","TON/USDT",
+    "SHIB/USDT","LTC/USDT","DOT/USDT","BCH/USDT","LINK/USDT",
+    "MATIC/USDT","UNI/USDT","ATOM/USDT","ETC/USDT","NEAR/USDT",
+    "FIL/USDT","APT/USDT","ARB/USDT","OP/USDT","ICP/USDT",
+    "VET/USDT","ALGO/USDT","XLM/USDT","HBAR/USDT","SAND/USDT",
+    "MANA/USDT","AAVE/USDT","EGLD/USDT","GRT/USDT","THETA/USDT",
+    "AXS/USDT","QNT/USDT","IMX/USDT","INJ/USDT","RNDR/USDT",
+    "FTM/USDT","CRV/USDT","RUNE/USDT","KAVA/USDT","GALA/USDT",
+    "ZEC/USDT","COMP/USDT","SNX/USDT","LDO/USDT"
 ]
 
 # =========================
-# INDICATORS
+# Indicators
 # =========================
 
 def ema(series, period):
@@ -66,7 +64,7 @@ def bollinger(close):
     return upper, lower
 
 # =========================
-# SCANNER ENGINE
+# Scanner
 # =========================
 
 data = []
@@ -74,7 +72,16 @@ data = []
 for symbol in symbols:
 
     try:
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe="15m", limit=120)
+        ohlcv = None
+
+        # 🔁 Retry logic (مهم جدًا)
+        for i in range(2):
+            try:
+                ohlcv = exchange.fetch_ohlcv(symbol, "15m", limit=120)
+                if ohlcv:
+                    break
+            except:
+                time.sleep(0.3)
 
         if not ohlcv or len(ohlcv) < 50:
             continue
@@ -83,18 +90,13 @@ for symbol in symbols:
         close = df["c"]
         price = close.iloc[-1]
 
-        # MACD
         macd_line, signal = macd(close)
         macd_value = macd_line.iloc[-1] - signal.iloc[-1]
 
-        # Bollinger
         upper, lower = bollinger(close)
         bb_range = upper.iloc[-1] - lower.iloc[-1]
         bb_position = (price - lower.iloc[-1]) / bb_range if bb_range != 0 else 0
 
-        # =========================
-        # SCORE SYSTEM
-        # =========================
         score = 0
 
         if macd_value > 0:
@@ -119,8 +121,7 @@ for symbol in symbols:
             "Signal": signal_type
         })
 
-    except Exception as e:
-        st.write(f"Error in {symbol}: {e}")
+    except:
         continue
 
 # =========================
@@ -130,7 +131,7 @@ for symbol in symbols:
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("⚠️ No data available right now.")
+    st.warning("⚠️ No data available right now (market delay or rate limit).")
 else:
     df = df.sort_values(by="Score", ascending=False)
 
