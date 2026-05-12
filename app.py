@@ -5,8 +5,7 @@ import numpy as np
 
 st.title("🔥 Advanced Crypto Scanner (Top 10 Signals)")
 
-exchange = ccxt.coinex()
-
+exchange = ccxt.binance()
 # =========================
 # 🟢 YOUR CUSTOM LIST
 # =========================
